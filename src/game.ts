@@ -56,7 +56,7 @@ export function createMarkSixGame(
         scene,
         camera,
         options: {
-          name: "Mark Six Halogen III Broadcast",
+          name: "Mark Six Broadcast",
           preset: "preview",
         },
       };

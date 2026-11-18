@@ -101,7 +101,7 @@ export class BroadcastHUD {
   private fastModeOn = false;
   private directorOn = true;
   private audioOn = true;
-  private historyCollapsed = false;
+  private historyCollapsed = true;
   private clockTimer: number | null = null;
   private winBannerTimer: number | null = null;
 
@@ -186,6 +186,11 @@ export class BroadcastHUD {
       saveDrawHistory(this.historyEntries);
       this.renderHistoryList();
     });
+
+    if (!this.isMobile) {
+      this.historyRail.classList.toggle("collapsed", this.historyCollapsed);
+      this.btnToggleHistory.textContent = this.historyCollapsed ? "+" : "−";
+    }
 
     this.btnToggleHistory.addEventListener("click", () => {
       if (this.isMobile) {

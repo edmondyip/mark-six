@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>香港六合彩 Mark Six — Smartplay Halogen III 攪珠模擬器</title>
+    <title>六合彩模擬器 | Mark Six Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@fontsource/playfair-display@5.1.0/600.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@fontsource/playfair-display@5.1.0/700.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&display=swap"
+    />
   </head>
   <body>
     <div id="canvas-container"></div>
@@ -17,7 +31,7 @@
           <span class="loader-ball ball-blue">09</span>
           <span class="loader-ball ball-green">28</span>
         </div>
-        <div class="mobile-loading-title">香港六合彩 · HALOGEN III</div>
+        <div class="mobile-loading-title">六合彩攪珠機模擬器</div>
         <div id="mobile-loading-text" class="mobile-loading-text">正在準備模擬器...</div>
         <div class="mobile-loading-bar-track">
           <div id="mobile-loading-bar" class="mobile-loading-bar-fill"></div>
@@ -26,15 +40,25 @@
       </div>
     </div>
 
+    <div id="host-speech-layer" class="host-speech-layer" aria-live="polite">
+      <div id="host-bubble-male" class="host-speech-bubble hidden">今次又唔中喎</div>
+      <div id="host-bubble-female" class="host-speech-bubble hidden">真係好可惜</div>
+    </div>
+
     <div id="broadcast-hud">
       <!-- Top Minimal Header -->
       <header id="tv-header">
         <div class="header-left">
           <div class="brand-pill">
-            <span class="brand-dot" aria-hidden="true"></span>
-            <span class="brand-zh">香港六合彩</span>
-            <span class="pill-divider" aria-hidden="true"></span>
-            <span class="brand-en">MARK SIX · HALOGEN III</span>
+            <div class="brand-emblem" aria-hidden="true">
+              <span class="brand-dot dot-red"></span>
+              <span class="brand-dot dot-blue"></span>
+              <span class="brand-dot dot-green"></span>
+            </div>
+            <div class="brand-text">
+              <h1 class="brand-zh">Mark Six</h1>
+              <span class="brand-sub">六合彩模擬器 · SIMULATOR</span>
+            </div>
           </div>
         </div>
         <div class="header-right">
@@ -195,8 +219,25 @@
             <span>記錄</span>
             <span class="toggle-pill" id="mobile-history-badge">0</span>
           </button>
-          <button id="btn-mobile-drawer" class="btn btn-secondary mobile-only-btn" type="button" aria-expanded="false">
-            <span>控制</span>
+          <button
+            id="btn-mobile-drawer"
+            class="btn btn-secondary mobile-only-btn"
+            type="button"
+            aria-expanded="false"
+            aria-label="控制與攝影機視角"
+            title="控制與攝影機視角"
+          >
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
           </button>
         </div>
 
@@ -222,19 +263,17 @@
           <span class="popover-title">控制與攝影機視角</span>
           <div class="mobile-drawer-meta">
             <a href="https://github.com/edmondyip/mark-six" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <span aria-hidden="true">·</span>
-            <a href="https://github.com/edmondyip/mark-six/issues" target="_blank" rel="noopener noreferrer">免責聲明</a>
             <button id="btn-close-mobile-drawer" class="mini-btn mini-btn-close" type="button" aria-label="關閉控制面板">✕</button>
           </div>
         </div>
       </footer>
 
-      <aside id="disclaimer-note" class="disclaimer-note" aria-label="免責聲明">
-        <span>僅供學術與技術研究，非官方或賭博用途，如有需要可</span><a
-          href="https://github.com/edmondyip/mark-six/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-        >聯繫移除</a>
+      <aside id="disclaimer-note" class="disclaimer-note" aria-label="免責聲明與音樂出處">
+        <span>僅供學術與技術研究，非官方或賭博用途</span>
+        <span class="disclaimer-sep" aria-hidden="true">·</span>
+        <span>音樂：<a href="https://www.youtube.com/watch?v=3oA9HL20tDo" target="_blank" rel="noopener noreferrer">Shocking Blue - Inkpot</a></span>
+        <span class="disclaimer-sep" aria-hidden="true">·</span>
+        <span>如有需要可<a href="https://github.com/edmondyip/mark-six/issues" target="_blank" rel="noopener noreferrer">聯繫移除</a></span>
       </aside>
 
       <a

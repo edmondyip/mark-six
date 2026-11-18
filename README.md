@@ -1,8 +1,8 @@
-# 香港六合彩 Mark Six — Smartplay Halogen III 3D 攪珠模擬器
+# 香港六合彩 Mark Six — 3D 攪珠機模擬器
 
-以 WebGL / Three.js 與 Rapier3D 剛體物理引擎打造的香港六合彩 **Smartplay Halogen III** 3D 攪珠機互動模擬器。全程純程式生成模型、號碼球貼圖、全域光照烘培及廣播音效，無需外部 3D 模型或音訊素材即可於瀏覽器流暢運行。
+以 WebGL / Three.js 與 Rapier3D 剛體物理引擎打造的香港六合彩 **3D 攪珠機模擬器**。全程純程式生成模型、號碼球貼圖、全域光照烘培及廣播音效，無需外部 3D 模型或音訊素材即可於瀏覽器流暢運行。
 
-![香港六合彩 Mark Six Smartplay Halogen III 3D 攪珠模擬器實機截圖](./docs/preview.png)
+![香港六合彩 Mark Six 3D 攪珠機模擬器實機截圖](./docs/preview.png)
 
 ---
 
@@ -65,7 +65,7 @@ npm run bake-gi
 │   ├── balls/                    # 49 粒號碼球貼圖生成、Rapier3D 碰撞與抽籤狀態機
 │   ├── camera/                   # 多機位預設與自動導播攝影機控制
 │   ├── gi/                       # 靜態光照圖集載入與套用工具
-│   ├── machine/                  # Smartplay Halogen III 3D 機台程序化建模
+│   ├── machine/                  # 3D 攪珠機台程序化建模
 │   ├── studio/                   # 演播室場景與品牌字樣幾何
 │   ├── threert/                  # 渲染器、光影與環境反射封裝
 │   ├── ui/                       # HUD 介面、對獎邏輯、彩帶特效與歷史紀錄
@@ -94,7 +94,7 @@ npm run bake-gi
    ```bash
    git init
    git add .
-   git commit -m "Initial commit: Mark Six Halogen III 3D simulator"
+   git commit -m "Initial commit: Mark Six 3D simulator"
    git branch -M main
    git remote add origin https://github.com/<你的GitHub用戶名>/<你的Repo名稱>.git
    git push -u origin main

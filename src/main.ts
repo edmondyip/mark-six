@@ -104,6 +104,77 @@ async function bootstrap() {
   let director: CameraDirector | null = null;
   let hud: BroadcastHUD | null = null;
 
+  const maleBubbleEl = document.getElementById("host-bubble-male");
+  const femaleBubbleEl = document.getElementById("host-bubble-female");
+  const maleHeadWorld = new THREE.Vector3(-4.85, 6.08, -13.04);
+  const femaleHeadWorld = new THREE.Vector3(4.85, 5.92, -13.04);
+  const projVec = new THREE.Vector3();
+  let hostSpeechActive = false;
+
+  const MALE_LOSE_LINES = [
+    "今次又唔中喎",
+    "差少少咋喎今次",
+    "哎呀，今期又緣慳一面",
+    "唔緊要，下期再嚟過",
+    "今次唔中，下期實中",
+  ] as const;
+  const FEMALE_LOSE_LINES = [
+    "真係好可惜",
+    "爭少少好可惜呀",
+    "下期再接再厲啦",
+    "今次差少少運氣啫",
+    "唔好灰心，下期有機會",
+  ] as const;
+  const MALE_WIN_LINES = [
+    "今次發達啦",
+    "嘩，中咗獎呀！",
+    "財神到啦今次！",
+    "真係好運氣，今期有獎收",
+    "犀利呀，今次中咗啦！",
+  ] as const;
+  const FEMALE_WIN_LINES = [
+    "真係恭喜你",
+    "好勁呀，恭喜晒！",
+    "今日手氣真係好旺！",
+    "恭喜你中咗獎呀",
+    "太好啦，真係戥你開心",
+  ] as const;
+
+  const pickRandomLine = (lines: readonly string[]): string =>
+    lines[Math.floor(Math.random() * lines.length)];
+
+  const setHostSpeech = (visible: boolean, won = false) => {
+    hostSpeechActive = visible;
+    const pairs: Array<[HTMLElement | null, string]> = [
+      [maleBubbleEl, pickRandomLine(won ? MALE_WIN_LINES : MALE_LOSE_LINES)],
+      [femaleBubbleEl, pickRandomLine(won ? FEMALE_WIN_LINES : FEMALE_LOSE_LINES)],
+    ];
+    for (const [el, text] of pairs) {
+      if (!el) continue;
+      el.textContent = text;
+      el.classList.toggle("is-win", won);
+      el.classList.toggle("hidden", !visible);
+    }
+  };
+
+  const updateBubblePos = (
+    el: HTMLElement | null,
+    worldPos: THREE.Vector3,
+    cam: THREE.PerspectiveCamera,
+    vw: number,
+    vh: number,
+  ) => {
+    if (!el) return;
+    projVec.copy(worldPos).project(cam);
+    const inFront = projVec.z <= 1 && Math.abs(projVec.x) <= 1.05 && Math.abs(projVec.y) <= 1.05;
+    el.style.visibility = inFront ? "visible" : "hidden";
+    if (!inFront) return;
+    const sx = (projVec.x * 0.5 + 0.5) * vw;
+    const sy = (-projVec.y * 0.5 + 0.5) * vh;
+    el.style.left = `${sx.toFixed(1)}px`;
+    el.style.top = `${sy.toFixed(1)}px`;
+  };
+
   const game = createMarkSixGame(
     {
       onClack: (strength, panX) => audio.playClack(strength, panX),
@@ -128,6 +199,7 @@ async function bootstrap() {
       onDrawComplete: (drawn) => {
         hud?.setRunningState(false);
         const winTier = hud?.recordCompletedDraw(drawn) ?? 0;
+        setHostSpeech(true, winTier >= 1);
         if (winTier >= 1) {
           audio.playWinFanfare(winTier);
         } else {
@@ -162,12 +234,14 @@ async function bootstrap() {
     {
       onStartDraw: () => {
         audio.unlock();
+        setHostSpeech(false);
         hud?.resetSlots();
         hud?.setRunningState(true);
         node.event("start", "{}", Date.now());
       },
       onResetDraw: () => {
         audio.unlock();
+        setHostSpeech(false);
         director?.trackLiftHeight(null);
         director?.selectPreset("main", false);
         hud?.resetSlots();
@@ -232,6 +306,13 @@ async function bootstrap() {
 
     director?.update(dt);
     engine.render();
+
+    if (hostSpeechActive) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      updateBubblePos(maleBubbleEl, maleHeadWorld, engine.renderCamera, vw, vh);
+      updateBubblePos(femaleBubbleEl, femaleHeadWorld, engine.renderCamera, vw, vh);
+    }
   };
 
   requestAnimationFrame(animate);

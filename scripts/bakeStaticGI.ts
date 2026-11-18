@@ -262,6 +262,8 @@ function getTileSize(name: string): [number, number] {
   if (name === "static:track_clamps_all") return [112, 84];
   if (name === "static:ceiling_cans_all" || name === "static:track_rings_all") return [80, 60];
   if (name === "static:stage_rings_all") return [40, 20];
+  if (name === "static:host_elder_lip" || name === "static:host_pink_accent") return [64, 64];
+  if (name.startsWith("static:host_")) return [104, 104];
   if (name.startsWith("static:shoulder_wing")) return [128, 128];
   if (name.startsWith("static:tier_")) return [248, 40];
   if (name.startsWith("static:sign_")) return [48, 28];
@@ -438,7 +440,9 @@ async function main() {
     });
 
     if (isStaticTarget) {
-      const unpackMode = inferUnpackMode(geom.normals, geom.indices, geom.groups);
+      const unpackMode = obj.desc.name.startsWith("static:host_")
+        ? "single"
+        : inferUnpackMode(geom.normals, geom.indices, geom.groups);
       const [tileW, tileH] = getTileSize(obj.desc.name);
       requests.push({
         name: obj.desc.name,
@@ -656,7 +660,7 @@ async function main() {
   const orangePos = new THREE.Vector3(0, 1.674, 0);
   const ceilingSpots = Array.from({ length: 12 }, (_, i) => {
     const theta = (i / 12) * Math.PI * 2;
-    const pos = new THREE.Vector3(Math.sin(theta) * 12.15, 8.70, -Math.cos(theta) * 12.15);
+    const pos = new THREE.Vector3(Math.sin(theta) * 12.15, 8.80, -Math.cos(theta) * 12.15);
     const target = new THREE.Vector3(Math.sin(theta) * 14.48, 4.85, -Math.cos(theta) * 14.48);
     const aim = target.clone().sub(pos).normalize();
     return { pos, aim };
@@ -684,6 +688,33 @@ async function main() {
     return [e[0] * ei, e[1] * ei, e[2] * ei] as const;
   });
   const meshAlbedo = staticMeshes.map((sm) => sm.mat.color);
+
+  // Ignore the 360° outer cyclorama wall cylinder when testing key/fill directional visibility
+  const isDirectionalOccluded = (
+    origin: THREE.Vector3,
+    normal: THREE.Vector3,
+    dirVec: THREE.Vector3,
+  ): boolean => {
+    let tMin = 0.002;
+    ray.origin.copy(origin).addScaledVector(normal, 0.006);
+    ray.direction.copy(dirVec);
+    for (let step = 0; step < 3; step++) {
+      const hit = bvh.raycastFirst(ray, THREE.DoubleSide, tMin, 24.0);
+      if (!hit) return false;
+      const hitName =
+        hit.faceIndex !== undefined ? staticMeshes[triMeshId[hit.faceIndex]]?.name : undefined;
+      if (
+        hitName === "static:backdrop_wall" ||
+        hitName === "static:ceiling_light_rail" ||
+        hitName === "static:ceiling_cans_all"
+      ) {
+        tMin = hit.distance + 0.02;
+        continue;
+      }
+      return true;
+    }
+    return false;
+  };
 
   // PASS 1: Contact Shadow AO + Direct Light Visibility + First-Order Emissive Radiance
   for (let ti = 0; ti < texCount; ti++) {
@@ -743,28 +774,18 @@ async function main() {
 
     // 1b. Key directional light shadow test (for indirect bounce source accuracy)
     const keyDot = Math.max(0, N.dot(keyDir));
-    if (keyDot > 0.01) {
-      ray.origin.copy(P).addScaledVector(N, 0.006);
-      ray.direction.copy(keyDir);
-      const keyHit = bvh.raycastFirst(ray, THREE.DoubleSide, 0.002, 24.0);
-      if (!keyHit) {
-        irR += 1.45 * keyDot;
-        irG += 1.38 * keyDot;
-        irB += 1.24 * keyDot;
-      }
+    if (keyDot > 0.01 && !isDirectionalOccluded(P, N, keyDir)) {
+      irR += 1.45 * keyDot;
+      irG += 1.38 * keyDot;
+      irB += 1.24 * keyDot;
     }
 
     // 1c. Fill directional light bounce seed
     const fillDot = Math.max(0, N.dot(fillDir));
-    if (fillDot > 0.01) {
-      ray.origin.copy(P).addScaledVector(N, 0.006);
-      ray.direction.copy(fillDir);
-      const fillHit = bvh.raycastFirst(ray, THREE.DoubleSide, 0.002, 24.0);
-      if (!fillHit) {
-        irR += 0.55 * fillDot;
-        irG += 0.57 * fillDot;
-        irB += 0.65 * fillDot;
-      }
+    if (fillDot > 0.01 && !isDirectionalOccluded(P, N, fillDir)) {
+      irR += 0.55 * fillDot;
+      irG += 0.57 * fillDot;
+      irB += 0.65 * fillDot;
     }
 
     // 1d. Ring sampling of the 360-degree amber-orange LED platter rim (warm floor & pedestal bounce!)
@@ -793,7 +814,7 @@ async function main() {
       }
     }
 
-    // 1e. Overhead studio wall-grazing spotlights (tight high-contrast cones + crisp 3D signage shadows)
+    // 1e. Overhead studio wall-grazing spotlights (crisp scalloped studio cones + clean neutral-warm white)
     for (const sp of ceilingSpots) {
       lightVec.set(
         sp.pos.x + (rng() - 0.5) * 0.12 - P.x,
@@ -801,11 +822,11 @@ async function main() {
         sp.pos.z + (rng() - 0.5) * 0.12 - P.z,
       );
       const dist = lightVec.length();
-      if (dist > 0.2 && dist < 12.5) {
+      if (dist > 0.2 && dist < 13.5) {
         lightVec.multiplyScalar(1 / dist);
         const ndl = Math.max(0, N.dot(lightVec));
         const cosBeam = Math.max(0, -lightVec.dot(sp.aim));
-        const tCone = Math.max(0, Math.min(1, (cosBeam - 0.85) / (0.975 - 0.85)));
+        const tCone = Math.max(0, Math.min(1, (cosBeam - 0.76) / (0.96 - 0.76)));
         const coneWeight = Math.pow(tCone * tCone * (3 - 2 * tCone), 1.25);
         if (ndl > 0.02 && coneWeight > 0.01) {
           ray.origin.copy(P).addScaledVector(N, 0.006);
@@ -813,9 +834,9 @@ async function main() {
           const sHit = bvh.raycastFirst(ray, THREE.DoubleSide, 0.002, dist - 0.18);
           if (!sHit) {
             const atten = (ndl * coneWeight / (1 + 0.035 * dist * dist)) * 10.5;
-            irR += 1.08 * atten;
-            irG += 1.01 * atten;
-            irB += 0.90 * atten;
+            irR += 1.04 * atten;
+            irG += 1.02 * atten;
+            irB += 0.98 * atten;
           }
         }
       }

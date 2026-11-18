@@ -68,6 +68,19 @@ function computeRenderOrder(materialName: string, mat: THREE.Material): number {
   return 0;
 }
 
+function isForegroundMachineTransparent(
+  materialName: string,
+  mat: THREE.Material,
+): boolean {
+  if (!mat.transparent) return false;
+  const lower = materialName.toLowerCase();
+  return (
+    lower !== "hostcontactshadow" &&
+    lower !== "additive:wallwashglow" &&
+    lower !== "additive:orangerimhalo"
+  );
+}
+
 /**
  * Browser WebGL2 implementation of @threert/scene's Engine interface,
  * customized for HDR broadcast studio softbox reflections, transparent
@@ -97,6 +110,13 @@ export class ThreeEngine implements Engine {
   private bakedAoTexture: THREE.Texture | null = null;
   private bakedLightMapTexture: THREE.Texture | null = null;
 
+  private readonly dofFocusPoint = new THREE.Vector3(0, 2.85, 0);
+  private readonly dofSceneTarget: THREE.WebGLRenderTarget;
+  private readonly dofScene: THREE.Scene;
+  private readonly dofOrthoCamera: THREE.OrthographicCamera;
+  private readonly dofMaterial: THREE.ShaderMaterial;
+  private readonly dofQuad: THREE.Mesh;
+
   constructor(container: HTMLElement, options?: { isMobile?: boolean }) {
     this.isMobile = Boolean(options?.isMobile);
     const width = container.clientWidth || window.innerWidth;
@@ -118,13 +138,14 @@ export class ThreeEngine implements Engine {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x282b38);
+    this.scene.background = new THREE.Color(0xe4e7ee);
 
     this.hemiLight = new THREE.HemisphereLight(
       0xf1f5f9,
       0x7b82ad,
       this.isMobile ? 0.68 : 0.42,
     );
+    this.hemiLight.layers.enableAll();
     this.scene.add(this.hemiLight);
 
     try {
@@ -144,6 +165,117 @@ export class ThreeEngine implements Engine {
     );
     this.defaultCamera.position.set(0, 3.8, 10.6);
     this.activeCamera = this.defaultCamera;
+
+    const rtW = Math.max(1, Math.round(width * dpr));
+    const rtH = Math.max(1, Math.round(height * dpr));
+    const depthTexture = new THREE.DepthTexture(rtW, rtH, THREE.UnsignedIntType);
+    depthTexture.minFilter = THREE.NearestFilter;
+    depthTexture.magFilter = THREE.NearestFilter;
+
+    this.dofSceneTarget = new THREE.WebGLRenderTarget(rtW, rtH, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.HalfFloatType,
+      depthBuffer: true,
+    });
+    this.dofSceneTarget.depthTexture = depthTexture;
+
+    this.dofOrthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.dofScene = new THREE.Scene();
+    this.dofMaterial = new THREE.ShaderMaterial({
+      toneMapped: true,
+      depthTest: true,
+      depthFunc: THREE.AlwaysDepth,
+      depthWrite: true,
+      defines: {
+        TAP_COUNT: this.isMobile ? 12 : 20,
+      },
+      uniforms: {
+        tColor: { value: this.dofSceneTarget.texture },
+        tDepth: { value: depthTexture },
+        uNear: { value: this.defaultCamera.near },
+        uFar: { value: this.defaultCamera.far },
+        uFocusDist: { value: 10.6 },
+        uFocalDepth: { value: 2.2 },
+        uFarRange: { value: 9.5 },
+        uMaxBlur: { value: 0.0065 },
+        uAspect: { value: width / Math.max(1, height) },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tColor;
+        uniform sampler2D tDepth;
+        uniform float uNear;
+        uniform float uFar;
+        uniform float uFocusDist;
+        uniform float uFocalDepth;
+        uniform float uFarRange;
+        uniform float uMaxBlur;
+        uniform float uAspect;
+        varying vec2 vUv;
+
+        float rawDepthToDist(float rawDepth) {
+          float zNdc = rawDepth * 2.0 - 1.0;
+          return (2.0 * uNear * uFar) / (uFar + uNear - zNdc * (uFar - uNear));
+        }
+
+        float computeCoc(float dist) {
+          return smoothstep(
+            uFocusDist + uFocalDepth,
+            uFocusDist + uFocalDepth + uFarRange,
+            dist
+          );
+        }
+
+        void main() {
+          float centerRawDepth = texture2D(tDepth, vUv).r;
+          float centerDist = rawDepthToDist(centerRawDepth);
+          float centerCoc = computeCoc(centerDist);
+          vec3 centerColor = texture2D(tColor, vUv).rgb;
+          vec3 accumColor = centerColor;
+
+          if (uMaxBlur > 0.0002 && centerCoc > 0.004) {
+            float blurRadius = centerCoc * uMaxBlur;
+            vec3 sumColor = centerColor;
+            float sumWeight = 1.0;
+            const float GOLDEN_ANGLE = 2.39996323;
+
+            for (int i = 1; i <= TAP_COUNT; i++) {
+              float fi = float(i);
+              float r = sqrt(fi / float(TAP_COUNT)) * blurRadius;
+              float theta = fi * GOLDEN_ANGLE;
+              vec2 offset = vec2(cos(theta) / max(uAspect, 0.001), sin(theta)) * r;
+              vec2 sampleUv = clamp(vUv + offset, vec2(0.001), vec2(0.999));
+
+              float sampleRawDepth = texture2D(tDepth, sampleUv).r;
+              float sampleDist = rawDepthToDist(sampleRawDepth);
+              float sampleCoc = computeCoc(sampleDist);
+              float w = smoothstep(0.02, 0.25, sampleCoc);
+
+              sumColor += texture2D(tColor, sampleUv).rgb * w;
+              sumWeight += w;
+            }
+
+            accumColor = sumColor / sumWeight;
+          }
+
+          gl_FragColor = vec4(accumColor, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+          gl_FragDepth = centerRawDepth;
+        }
+      `,
+    });
+    this.dofQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dofMaterial);
+    this.dofQuad.frustumCulled = false;
+    this.dofScene.add(this.dofQuad);
   }
 
   get renderCamera(): THREE.PerspectiveCamera {
@@ -201,10 +333,49 @@ export class ThreeEngine implements Engine {
     }
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
+    const rtW = Math.max(1, Math.round(w * dpr));
+    const rtH = Math.max(1, Math.round(h * dpr));
+    this.dofSceneTarget.setSize(rtW, rtH);
+    this.dofMaterial.uniforms.uAspect.value = aspect;
   }
 
   render(): void {
+    const focusDist = this.activeCamera.position.distanceTo(this.dofFocusPoint);
+    const dofFade = 1 - THREE.MathUtils.smoothstep(focusDist, 7.2, 9.8);
+    const baseMaxBlur = THREE.MathUtils.clamp(
+      0.068 / Math.max(3.8, focusDist),
+      0.0064,
+      0.012,
+    );
+    this.dofMaterial.uniforms.uFocusDist.value = focusDist;
+    this.dofMaterial.uniforms.uNear.value = this.activeCamera.near;
+    this.dofMaterial.uniforms.uFar.value = this.activeCamera.far;
+    this.dofMaterial.uniforms.uMaxBlur.value = baseMaxBlur * dofFade;
+
+    // Pass 1: Render Layer 0 (studio, hosts, signage, opaque balls & machine body) into linear HDR target + depth
+    this.activeCamera.layers.set(0);
+    this.renderer.setRenderTarget(this.dofSceneTarget);
+    this.renderer.clear(true, true, false);
     this.renderer.render(this.scene, this.activeCamera);
+
+    // Pass 2: Screen-space Bokeh DoF composite + AgX tone mapping + preserve Layer 0 hardware depth via gl_FragDepth
+    this.renderer.setRenderTarget(null);
+    this.renderer.clear(true, true, false);
+    this.renderer.render(this.dofScene, this.dofOrthoCamera);
+
+    // Pass 3: Render Layer 1 (razor-sharp foreground machine acrylic rack, tracks & glass drum) directly over depth buffer
+    const prevBg = this.scene.background;
+    const prevAutoClear = this.renderer.autoClear;
+    const prevShadowAuto = this.renderer.shadowMap.autoUpdate;
+    this.scene.background = null;
+    this.renderer.autoClear = false;
+    this.renderer.shadowMap.autoUpdate = false;
+    this.activeCamera.layers.set(1);
+    this.renderer.render(this.scene, this.activeCamera);
+    this.scene.background = prevBg;
+    this.renderer.autoClear = prevAutoClear;
+    this.renderer.shadowMap.autoUpdate = prevShadowAuto;
+    this.activeCamera.layers.enableAll();
   }
 
   getRenderStats() {
@@ -566,6 +737,7 @@ export class ThreeEngine implements Engine {
       if (entry.materialId === id) {
         entry.mesh.material = mat;
         entry.mesh.renderOrder = computeRenderOrder(desc.name, mat);
+        entry.mesh.layers.set(isForegroundMachineTransparent(desc.name, mat) ? 1 : 0);
       }
     }
   }
@@ -601,10 +773,11 @@ export class ThreeEngine implements Engine {
         }
 
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = desc.castShadow;
+        mesh.castShadow = desc.castShadow && !mat.transparent;
         mesh.receiveShadow = !mat.transparent;
         const matName = this.materialDescs.get(desc.material)?.name ?? "";
         mesh.renderOrder = computeRenderOrder(matName, mat);
+        mesh.layers.set(isForegroundMachineTransparent(matName, mat) ? 1 : 0);
         this.meshesByObj.set(id, { mesh, materialId: desc.material });
         obj = mesh;
       }
@@ -728,9 +901,7 @@ export class ThreeEngine implements Engine {
   }
 
   environment(desc: EnvironmentDesc): void {
-    if (desc.background) {
-      this.scene.background = linearColor(desc.background);
-    }
+    this.scene.background = new THREE.Color(0xe4e7ee);
     if (desc.fog) {
       const fogColor = linearColor(desc.fog.color);
       this.scene.fog = new THREE.FogExp2(fogColor.getHex(), desc.fog.density);
@@ -782,6 +953,10 @@ export class ThreeEngine implements Engine {
   instances(): void {}
 
   destroy(): void {
+    this.dofSceneTarget.depthTexture?.dispose();
+    this.dofSceneTarget.dispose();
+    this.dofQuad.geometry.dispose();
+    this.dofMaterial.dispose();
     this.bakedAoTexture?.dispose();
     this.bakedLightMapTexture?.dispose();
     this.studioEnvTexture.dispose();
@@ -793,6 +968,12 @@ export class ThreeEngine implements Engine {
   }
 
   private buildLightObject(desc: LightDesc): THREE.Light {
+    const lightObj = this.createLightObject(desc);
+    lightObj.layers.enableAll();
+    return lightObj;
+  }
+
+  private createLightObject(desc: LightDesc): THREE.Light {
     const color = linearColor(desc.color);
     switch (desc.type) {
       case "directional": {
@@ -804,7 +985,7 @@ export class ThreeEngine implements Engine {
           dir.shadow.mapSize.set(1024, 1024);
           dir.shadow.camera.near = 0.5;
           dir.shadow.camera.far = 35;
-          const b = 8;
+          const b = 10.5;
           dir.shadow.camera.left = -b;
           dir.shadow.camera.right = b;
           dir.shadow.camera.top = b;

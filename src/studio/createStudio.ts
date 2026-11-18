@@ -19,6 +19,7 @@ import {
   mergeSceneGeometries,
 } from "../utils/procedural";
 import { createCurvedWallSignageGeometry } from "./studioSignage";
+import { createStudioHosts } from "./createStudioHosts";
 
 export interface StudioBuildResult {
   group: Group;
@@ -35,14 +36,13 @@ function createStudioBackdropTexture(isMobile = false) {
   const w = canvas.width;
   const h = canvas.height;
 
-  // Clean pearl-silver broadcast cyclorama into light periwinkle-blue bottom wash
+  // Clean pearl-silver broadcast cyclorama into soft cool-slate bottom wash
   const bg = ctx.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0.0, "#bcbac6");
-  bg.addColorStop(0.32, "#cbc9d4");
-  bg.addColorStop(0.62, "#c6c6d4");
-  bg.addColorStop(0.76, "#aeb7ef");
-  bg.addColorStop(0.89, "#8c9ef8");
-  bg.addColorStop(1.0, "#7b90fa");
+  bg.addColorStop(0.0, "#e4e7ee");
+  bg.addColorStop(0.38, "#dfe3ec");
+  bg.addColorStop(0.70, "#d7dde9");
+  bg.addColorStop(0.88, "#cdd6ea");
+  bg.addColorStop(1.0, "#c2cdea");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
@@ -66,18 +66,18 @@ function createStudioBackdropTexture(isMobile = false) {
     ctx.stroke();
   }
 
-  // Soft pastel periwinkle bottom wash bloom
+  // Soft cool-slate bottom wash bloom
   const washGrad = ctx.createLinearGradient(0, h, 0, h * 0.54);
-  washGrad.addColorStop(0.0, "rgba(155, 172, 255, 0.42)");
-  washGrad.addColorStop(0.48, "rgba(176, 190, 255, 0.18)");
+  washGrad.addColorStop(0.0, "rgba(168, 184, 240, 0.22)");
+  washGrad.addColorStop(0.48, "rgba(180, 194, 245, 0.08)");
   washGrad.addColorStop(1.0, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = washGrad;
   ctx.fillRect(0, h * 0.54, w, h * 0.46);
 
-  // Radiant violet-blue LED seam line at wall base
+  // Subtle cool-blue LED seam line at wall base
   const bottomStrip = ctx.createLinearGradient(0, h - 18, 0, h);
   bottomStrip.addColorStop(0, "rgba(129, 140, 248, 0)");
-  bottomStrip.addColorStop(1, "rgba(196, 181, 253, 0.94)");
+  bottomStrip.addColorStop(1, "rgba(165, 180, 245, 0.45)");
   ctx.fillStyle = bottomStrip;
   ctx.fillRect(0, h - 20, w, 20);
 
@@ -94,9 +94,9 @@ function createWashGlowTexture() {
   const ctx = canvas.getContext("2d")!;
 
   const g = ctx.createLinearGradient(0, canvas.height, 0, 0);
-  g.addColorStop(0, "rgba(165, 180, 252, 0.48)");
-  g.addColorStop(0.38, "rgba(147, 165, 255, 0.22)");
-  g.addColorStop(0.75, "rgba(165, 180, 252, 0.06)");
+  g.addColorStop(0, "rgba(165, 180, 252, 0.28)");
+  g.addColorStop(0.38, "rgba(147, 165, 255, 0.12)");
+  g.addColorStop(0.75, "rgba(165, 180, 252, 0.03)");
   g.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -195,7 +195,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   // 360-degree studio arena centered around the Halogen III machine (x=0, z=0)
   const arcCenterZ = 0;
   const wallRadius = 14.5;
-  const wallHeight = 8.8;
+  const wallHeight = 9.2;
   const fullCircleArc = Math.PI * 2;
 
   // 1. Soft glossy studio floor with subtle architectural panel seams & micro-roughness
@@ -215,6 +215,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   const floorMesh = new Mesh(new CylinderGeometry(wallRadius + 0.4, wallRadius + 0.4, 0.1, 72), floorMat);
   floorMesh.name = "static:studio_floor";
   floorMesh.position.set(0, -0.05, 0);
+  floorMesh.castShadow = false;
   floorMesh.receiveShadow = true;
   group.add(floorMesh);
 
@@ -231,6 +232,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   }));
   const stageRings = new Mesh(mergeSceneGeometries(stageRingParts, true), stageTrimMat);
   stageRings.name = "static:stage_rings_all";
+  stageRings.castShadow = false;
   group.add(stageRings);
 
   // Subtle floor turntable disc pad beneath the white cone
@@ -242,6 +244,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   const podiumDisc = new Mesh(new CylinderGeometry(1.38, 1.44, 0.02, 56), podiumMat);
   podiumDisc.name = "static:podium_disc";
   podiumDisc.position.set(0, 0.01, 0);
+  podiumDisc.castShadow = false;
   podiumDisc.receiveShadow = true;
   group.add(podiumDisc);
 
@@ -268,7 +271,9 @@ export function createStudio(isMobile = false): StudioBuildResult {
   );
   const backdropMesh = new Mesh(backdropGeo, backdropMat);
   backdropMesh.name = "static:backdrop_wall";
-  backdropMesh.position.set(0, 1.44, 0);
+  backdropMesh.position.set(0, 1.35, 0);
+  backdropMesh.castShadow = false;
+  backdropMesh.receiveShadow = true;
   group.add(backdropMesh);
 
   // 2b. 3D Extruded Beveled Architectural Wall Signage (Chocolate Classical Sans)
@@ -290,12 +295,12 @@ export function createStudio(isMobile = false): StudioBuildResult {
     spacing: number;
   }> = [
     { text: "M A R K  S I X", dTheta: 0.0, y: 7.65, h: 0.82, spacing: 0.16 },
-    { text: "六 合 彩", dTheta: -0.46, y: 6.20, h: 0.46, spacing: 0.14 },
-    { text: "六 合 彩", dTheta: 0.42, y: 7.45, h: 0.42, spacing: 0.14 },
-    { text: "M A R K  S I X", dTheta: -0.18, y: 5.95, h: 0.40, spacing: 0.13 },
-    { text: "M A R K  S I X", dTheta: 0.39, y: 5.20, h: 0.42, spacing: 0.13 },
-    { text: "六 合 彩", dTheta: 0.40, y: 4.25, h: 0.46, spacing: 0.14 },
-    { text: "M A R K  S I X", dTheta: -0.45, y: 3.30, h: 0.36, spacing: 0.12 },
+    { text: "六 合 彩", dTheta: -0.56, y: 6.35, h: 0.46, spacing: 0.14 },
+    { text: "六 合 彩", dTheta: 0.44, y: 7.45, h: 0.42, spacing: 0.14 },
+    { text: "M A R K  S I X", dTheta: -0.16, y: 6.05, h: 0.40, spacing: 0.13 },
+    { text: "M A R K  S I X", dTheta: 0.62, y: 5.35, h: 0.42, spacing: 0.13 },
+    { text: "六 合 彩", dTheta: 0.58, y: 3.95, h: 0.46, spacing: 0.14 },
+    { text: "M A R K  S I X", dTheta: -0.62, y: 3.35, h: 0.36, spacing: 0.12 },
   ];
 
   const signParts: MergeGeometryPart[] = [];
@@ -319,6 +324,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   }
   const signMesh = new Mesh(mergeSceneGeometries(signParts, true), signMat);
   signMesh.name = "static:signs_all";
+  signMesh.castShadow = false;
   signMesh.receiveShadow = true;
   group.add(signMesh);
 
@@ -337,7 +343,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   spotLensMat.name = "emitter:ceilingSpotLens";
 
   const trussRadius = 12.35;
-  const trussY = 8.95;
+  const trussY = 9.05;
   const lightingRail = new Mesh(
     new TorusGeometry(trussRadius, 0.045, 10, 72),
     trussMat,
@@ -345,6 +351,7 @@ export function createStudio(isMobile = false): StudioBuildResult {
   lightingRail.name = "static:ceiling_light_rail";
   lightingRail.rotation.x = Math.PI / 2;
   lightingRail.position.set(0, trussY, 0);
+  lightingRail.castShadow = false;
   group.add(lightingRail);
 
   const spotCanParts: MergeGeometryPart[] = [];
@@ -374,16 +381,18 @@ export function createStudio(isMobile = false): StudioBuildResult {
   }
   const spotCansAll = new Mesh(mergeSceneGeometries(spotCanParts, true), trussMat);
   spotCansAll.name = "static:ceiling_cans_all";
+  spotCansAll.castShadow = false;
   group.add(spotCansAll);
 
   const spotLensesAll = new Mesh(mergeSceneGeometries(spotLensParts), spotLensMat);
+  spotLensesAll.castShadow = false;
   group.add(spotLensesAll);
 
   // Full 360-degree pastel periwinkle-blue wall-washer strip + upward additive beam
   const washerStripMat = new MeshStandardMaterial({
-    color: 0x818cf8,
-    emissive: 0x6d7dff,
-    emissiveIntensity: 1.95,
+    color: 0x8f9ff0,
+    emissive: 0x7688ea,
+    emissiveIntensity: 1.65,
     roughness: 0.2,
     side: DoubleSide,
   });
@@ -396,14 +405,15 @@ export function createStudio(isMobile = false): StudioBuildResult {
     72,
   );
   const washerBar = new Mesh(washerGeo, washerStripMat);
-  washerBar.position.set(0, 1.44, 0);
+  washerBar.position.set(0, 1.35, 0);
+  washerBar.castShadow = false;
   group.add(washerBar);
 
   const washGlowMat = new MeshBasicMaterial({
     color: 0x8f9eff,
     map: createWashGlowTexture(),
     transparent: true,
-    opacity: 0.54,
+    opacity: 0.36,
     side: DoubleSide,
   });
   washGlowMat.name = "additive:wallWashGlow";
@@ -415,7 +425,8 @@ export function createStudio(isMobile = false): StudioBuildResult {
     72,
   );
   const washArc = new Mesh(washArcGeo, washGlowMat);
-  washArc.position.set(0, 1.45, 0);
+  washArc.position.set(0, 1.36, 0);
+  washArc.castShadow = false;
   group.add(washArc);
 
   // 3. Full 360-Degree Concentric 3-Tier Black & White Illuminated Stepped Risers
@@ -444,9 +455,9 @@ export function createStudio(isMobile = false): StudioBuildResult {
   stepLedMat.name = "emitter:stepLed";
 
   const circularTiers = [
-    { rInner: 12.65, rOuter: 13.25, yBottom: 0.00, yTop: 0.48 },
-    { rInner: 13.22, rOuter: 13.85, yBottom: 0.48, yTop: 0.96 },
-    { rInner: 13.82, rOuter: 14.55, yBottom: 0.96, yTop: 1.44 },
+    { rInner: 11.45, rOuter: 12.50, yBottom: 0.00, yTop: 0.45 },
+    { rInner: 12.46, rOuter: 13.52, yBottom: 0.45, yTop: 0.90 },
+    { rInner: 13.48, rOuter: 14.55, yBottom: 0.90, yTop: 1.35 },
   ];
 
   const blackTierParts: MergeGeometryPart[] = [];
@@ -470,16 +481,22 @@ export function createStudio(isMobile = false): StudioBuildResult {
 
   const blackTiersAll = new Mesh(mergeSceneGeometries(blackTierParts, true), blackRecessMat);
   blackTiersAll.name = "static:tier_black_all";
+  blackTiersAll.castShadow = false;
   blackTiersAll.receiveShadow = true;
   group.add(blackTiersAll);
 
   const whiteTiersAll = new Mesh(mergeSceneGeometries(whiteTierParts, true), whiteStepMat);
   whiteTiersAll.name = "static:tier_white_all";
+  whiteTiersAll.castShadow = false;
   whiteTiersAll.receiveShadow = true;
   group.add(whiteTiersAll);
 
   const ledArcsAll = new Mesh(mergeSceneGeometries(ledArcParts), stepLedMat);
+  ledArcsAll.castShadow = false;
   group.add(ledArcsAll);
+
+  // 3b. Motionless Smooth Studio Hosts standing on top-tier rear stepped risers
+  group.add(createStudioHosts(isMobile));
 
   // 4. Sculpted High-FPS Lighting Rig (relying on baked GI lightmap for wall spotlights & perimeter wash)
   const keyLight = new DirectionalLight(0xfff8f0, 1.92);
