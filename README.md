@@ -1,6 +1,6 @@
-# 香港六合彩 Mark Six — 3D 攪珠機模擬器
+# 六合彩模擬器 | Mark Six Simulator
 
-以 WebGL / Three.js 與 Rapier3D 剛體物理引擎打造的香港六合彩 **3D 攪珠機模擬器**。全程純程式生成模型、號碼球貼圖、全域光照烘培及廣播音效，無需外部 3D 模型或音訊素材即可於瀏覽器流暢運行。
+以 WebGL / Three.js 與 Rapier3D 剛體物理引擎打造的香港六合彩 **3D 攪珠機模擬器**。結合純程式生成 3D 攪珠機台、號碼球貼圖、預烘焙靜態全域光照、即時光學景深、真人去背實景主持與廣播音效，支援桌面版與手機版瀏覽器流暢運行。
 
 ![香港六合彩 Mark Six 3D 攪珠機模擬器實機截圖](./docs/preview.png)
 
@@ -15,7 +15,10 @@
 - **自選號碼對獎與分級中獎特效**：
   - 支援自選 6 個號碼或一鍵「機選一注」，完成攪珠後前 6 個正碼自動由小到大排列，並於選號列與結果列同步亮起命中號碼。
   - **四至七獎**：彩色紙碎慶祝與和弦音效；**二／三獎**：雙側彩炮連發與進階祝捷音效；**頭獎（6 碼全中）**：專屬金色星雨多波彩炮、全畫面金光氛圍光暈、頭獎閃耀橫幅與加長交響鐘聲。
-- **快抽模式與開獎紀錄**：可切換標準電視節奏／快速攪珠模式，右側邊欄自動保留最近 10 局開獎紀錄（存於瀏覽器 `localStorage`）。
+- **快抽模式與開彩記錄**：可切換標準電視節奏／快速攪珠模式，右上角「開彩記錄」預設收起以保留演播室視野（點擊 `+` 可隨時展開查看最近 10 局紀錄，存於瀏覽器 `localStorage`）。
+- **真人去背實景主持與廣東話對白氣泡**：於舞台中景地面配置去背羽化、垂直光影漸層、亮面地板微弱倒影與即時 `keyLight` 剪影投影的兩位真人主持立牌（支援 Y 軸自動面向鏡頭）；每局攪珠結束後，頭頂會顯示 3D 座標追蹤的粵語隨機對白氣泡（依中獎／未中獎分別隨機播出多句廣東話反應，重新裝球或開始下一局時自動移除）。
+- **動態光學景深（Bokeh DoF）**：透過 3-pass RenderTarget 景深管線，於「正面全景」保持攪珠機與主持清晰並輕微虛化遠景背景牆；切換特寫鏡位或拉近對焦攪珠機時平滑漸入散景模糊，透明壓克力與玻璃罩維持完整銳利度。
+- **桌面版與手機版響應式介面**：啟動時顯示載入進度畫面，手機版自動最佳化渲染負荷（降低像素比與停用即時陰影圖），並提供全寬大字體開獎結果列、Icon 化控制抽屜及底端學術與音樂出處標註。
 - **廣播音效與背景音樂**：整合隱藏式 YouTube IFrame 背景音樂播放器（[Shocking Blue - Inkpot](https://www.youtube.com/watch?v=lAwiWIBOz24)），配合 Web Audio 即時合成球體碰撞聲、升球氣動聲及開獎／中獎鐘聲（若瀏覽器封鎖或離線，會自動切換為內置 Web Audio 合成背景音樂，並可隨時一鍵靜音）。
 
 ---
@@ -57,7 +60,9 @@ npm run bake-gi
 │   └── deploy-pages.yml          # GitHub Pages 自動建置及部署工作流程
 ├── docs/
 │   └── preview.png               # README 預覽截圖
-├── public/gi/                    # 離線烘焙之靜態 AO / Lightmap / UV 配置檔
+├── public/
+│   ├── gi/                       # 離線烘焙之靜態 AO / Lightmap / UV 配置檔
+│   └── hosts/                    # 真人去背主持立牌透明 PNG 貼圖（host-male.png / host-female.png）
 ├── scripts/
 │   └── bakeStaticGI.ts           # three-mesh-bvh 全域光照離線烘焙腳本
 ├── src/
@@ -81,31 +86,18 @@ npm run bake-gi
 
 ---
 
-## 發佈到 GitHub Pages 步驟
+## Dev Log（開發紀錄）
 
-本專案已預先完成 GitHub Pages 相容配置：
-- `vite.config.ts` 已設定 `base: "./"`，可直接部署於 `https://<帳號>.github.io/<儲存庫名稱>/` 子路徑。
-- `src/main.ts` 已透過 `import.meta.env.BASE_URL` 載入 `public/gi/` 靜態貼圖，確保子路徑下正常讀取。
-- 已內建 `.github/workflows/deploy-pages.yml` 自動部署工作流程。
-
-### 公開發佈流程
-
-1. **建立並推送至 GitHub 儲存庫（`main` 分支）**：
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit: Mark Six 3D simulator"
-   git branch -M main
-   git remote add origin https://github.com/<你的GitHub用戶名>/<你的Repo名稱>.git
-   git push -u origin main
-   ```
-2. **於 GitHub 開啟 GitHub Pages**：
-   - 進入 GitHub 儲存庫頁面 → **Settings** → 左側選單 **Pages**。
-   - 在 **Build and deployment** 下的 **Source** 選擇 **GitHub Actions**。
-3. **完成自動部署**：
-   - 推送至 `main` 後，**Actions** 分頁會自動執行 `Deploy to GitHub Pages`（執行 `npm ci` 與 `npm run build` 並發佈 `dist/`）。
-   - 若儲存庫為私人（Private）且帳號非 Pro/Enterprise，請先於 **Settings → General → Danger Zone** 將儲存庫設為 **Public**，方可使用免費公開 GitHub Pages。
-   - 部署完成後即可透過頁面顯示的 `https://<你的GitHub用戶名>.github.io/<你的Repo名稱>/` 網址公開瀏覽。
+- **2026-11-18 — 雙平台適配、載入畫面與介面統一**
+  - 新增手機版響應式版面、可收合控制抽屜（圖示化按鈕）、全寬大字號開獎結果列與效能降載優化；桌面版與手機版皆加入啟動載入進度畫面。
+  - 統一 HUD 面板圓角與層級，「開獎紀錄」正名為「開彩記錄」並加大記錄球內距；「開彩記錄」改為預設收起，並將學術研究與音樂出處移至畫面底端置中顯示。
+  - 重新設計左上角雙語品牌徽章（`Mark Six / 六合彩模擬器 · SIMULATOR` + 三色球點綴）並更新頁面標題為 `六合彩模擬器 | Mark Six Simulator`。
+- **2026-11-18 — 演播室光影修復與動態景深（Bokeh DoF）**
+  - 修正 `bakeStaticGI.ts` 方向光遮蔽測試誤打中 360° 外牆與頂部燈軌所造成的牆面／地面暗影斷層，並關閉場景建築網格的 `castShadow` 以消除旋轉視角時的大型斜向投影。
+  - 於 `ThreeEngine.ts` 實作 3-pass 景深渲染管線：將透明壓克力與玻璃罩分層於 Layer 1 保持銳利，於「正面全景」僅做輕微遠景分離，特寫對焦攪珠機時平順漸入背景散景。
+- **2026-11-18 — 真人去背實景主持、地板倒影與粵語對白互動**
+  - 由原本程式化 3D 人偶替換為去背羽化真人立牌（`public/hosts/host-male.png`、`host-female.png`），前移至舞台中景地面並支援 Y 軸自動面向鏡頭、垂直棚拍受光漸層、亮面地板倒影及 `2048×2048` 即時 `keyLight` 樓梯剪影投影。
+  - 新增攪珠完成後的 3D 螢幕投影粵語對白氣泡，依中獎／未中獎隨機播出多句廣東話反應，於重新裝球或開始新局時自動移除。
 
 ---
 
