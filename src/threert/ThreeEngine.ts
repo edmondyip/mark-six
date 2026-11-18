@@ -75,7 +75,7 @@ function isForegroundMachineTransparent(
   if (!mat.transparent) return false;
   const lower = materialName.toLowerCase();
   return (
-    lower !== "hostcontactshadow" &&
+    !lower.startsWith("host") &&
     lower !== "additive:wallwashglow" &&
     lower !== "additive:orangerimhalo"
   );
@@ -116,6 +116,7 @@ export class ThreeEngine implements Engine {
   private readonly dofOrthoCamera: THREE.OrthographicCamera;
   private readonly dofMaterial: THREE.ShaderMaterial;
   private readonly dofQuad: THREE.Mesh;
+  private readonly hostStandees: THREE.Group[] = [];
 
   constructor(container: HTMLElement, options?: { isMobile?: boolean }) {
     this.isMobile = Boolean(options?.isMobile);
@@ -320,6 +321,162 @@ export class ThreeEngine implements Engine {
     this.hemiLight.intensity = 0.24;
   }
 
+  /**
+   * Mounts photographic alpha-feathered studio host standees on the studio floor
+   * with vertical lighting gradient, glossy floor reflection, and Y-axis billboarding.
+   */
+  setHostStandees(maleTex: THREE.Texture, femaleTex: THREE.Texture): void {
+    const specs: Array<{
+      name: string;
+      tex: THREE.Texture;
+      pos: [number, number, number];
+      height: number;
+      aspect: number;
+    }> = [
+      {
+        name: "hostStandeeMale",
+        tex: maleTex,
+        pos: [-3.80, 0, -7.8],
+        height: 4.65,
+        aspect: 369 / 960,
+      },
+      {
+        name: "hostStandeeFemale",
+        tex: femaleTex,
+        pos: [3.80, 0, -7.8],
+        height: 4.42,
+        aspect: 239 / 929,
+      },
+    ];
+
+    for (const spec of specs) {
+      spec.tex.colorSpace = THREE.SRGBColorSpace;
+      spec.tex.anisotropy = this.isMobile
+        ? 1
+        : Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      spec.tex.needsUpdate = true;
+
+      const width = spec.height * spec.aspect;
+      const hostGroup = new THREE.Group();
+      hostGroup.name = spec.name;
+      hostGroup.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
+
+      // Upright photographic standee with rich contrast, directional 3-point shading & feathered alpha
+      const standeeMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: true,
+        side: THREE.DoubleSide,
+        uniforms: {
+          uMap: { value: spec.tex },
+        },
+        vertexShader: /* glsl */ `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform sampler2D uMap;
+          varying vec2 vUv;
+          void main() {
+            vec4 tex = texture2D(uMap, vUv);
+            if (tex.a < 0.04) discard;
+            // Deepen contrast/saturation so photographic hosts match dark studio contrast
+            vec3 richCol = pow(max(tex.rgb, vec3(0.0001)), vec3(1.18)) * 0.66;
+            // Directional shading matching keyLight from front-right (+x, +y)
+            float vGrad = mix(0.72, 1.04, smoothstep(0.0, 0.78, vUv.y));
+            float hGrad = mix(0.80, 1.06, smoothstep(0.15, 0.85, vUv.x));
+            vec3 studioTint = vec3(0.96, 0.97, 1.02) * vGrad * hGrad;
+            gl_FragColor = vec4(richCol * studioTint, tex.a);
+          }
+        `,
+      });
+      standeeMat.name = "hostStandeeMat";
+      const standeeMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, spec.height),
+        standeeMat,
+      );
+      standeeMesh.position.set(0, spec.height * 0.5, 0);
+      // Cast real-time directional keyLight human-silhouette shadow onto both the studio floor and rear staircase steps
+      standeeMesh.castShadow = !this.isMobile;
+      standeeMesh.customDepthMaterial = new THREE.ShaderMaterial({
+        side: THREE.DoubleSide,
+        uniforms: {
+          uMap: { value: spec.tex },
+        },
+        vertexShader: /* glsl */ `
+          varying vec2 vUv;
+          varying vec2 vHighPrecisionZW;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            vHighPrecisionZW = gl_Position.zw;
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          #include <packing>
+          uniform sampler2D uMap;
+          varying vec2 vUv;
+          varying vec2 vHighPrecisionZW;
+          void main() {
+            if (texture2D(uMap, vUv).a < 0.35) discard;
+            float fragCoordZ = 0.5 * vHighPrecisionZW[0] / vHighPrecisionZW[1] + 0.5;
+            gl_FragColor = packDepthToRGBA(fragCoordZ);
+          }
+        `,
+      });
+      standeeMesh.receiveShadow = false;
+      standeeMesh.layers.set(0);
+      hostGroup.add(standeeMesh);
+
+      // Glossy epoxy floor mirror reflection fading smoothly behind the host's shoes
+      const reflLen = spec.height * 0.56;
+      const reflMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+          uMap: { value: spec.tex },
+        },
+        vertexShader: /* glsl */ `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform sampler2D uMap;
+          varying vec2 vUv;
+          void main() {
+            // Sample near bottom of host texture (feet -> knees) mirrored onto floor
+            vec2 sampleUv = vec2(vUv.x, (1.0 - vUv.y) * 0.65);
+            vec4 tex = texture2D(uMap, sampleUv);
+            float fade = pow(vUv.y, 2.2) * 0.22;
+            float a = tex.a * fade;
+            if (a < 0.005) discard;
+            gl_FragColor = vec4(tex.rgb * vec3(0.75, 0.78, 0.88), a);
+          }
+        `,
+      });
+      reflMat.name = "hostFloorReflectionMat";
+      const reflMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, reflLen),
+        reflMat,
+      );
+      reflMesh.rotation.x = -Math.PI / 2;
+      reflMesh.position.set(0, 0.004, -reflLen * 0.5);
+      reflMesh.castShadow = false;
+      reflMesh.receiveShadow = false;
+      reflMesh.layers.set(0);
+      hostGroup.add(reflMesh);
+
+      this.scene.add(hostGroup);
+      this.hostStandees.push(hostGroup);
+    }
+  }
+
   resize(width: number, height: number): void {
     const w = Math.max(1, width);
     const h = Math.max(1, height);
@@ -340,17 +497,29 @@ export class ThreeEngine implements Engine {
   }
 
   render(): void {
-    const focusDist = this.activeCamera.position.distanceTo(this.dofFocusPoint);
-    const dofFade = 1 - THREE.MathUtils.smoothstep(focusDist, 7.2, 9.8);
-    const baseMaxBlur = THREE.MathUtils.clamp(
-      0.068 / Math.max(3.8, focusDist),
-      0.0064,
-      0.012,
+    const camPos = this.activeCamera.position;
+    for (const standee of this.hostStandees) {
+      standee.rotation.y = Math.atan2(
+        camPos.x - standee.position.x,
+        camPos.z - standee.position.z,
+      );
+    }
+
+    const focusDist = camPos.distanceTo(this.dofFocusPoint);
+    const wideT = THREE.MathUtils.smoothstep(focusDist, 6.8, 9.6);
+    const focalDepth = THREE.MathUtils.lerp(2.2, 8.4, wideT);
+    const farRange = THREE.MathUtils.lerp(9.5, 7.5, wideT);
+    const maxBlur = THREE.MathUtils.lerp(
+      THREE.MathUtils.clamp(0.068 / Math.max(3.8, focusDist), 0.0064, 0.0115),
+      0.0028,
+      wideT,
     );
     this.dofMaterial.uniforms.uFocusDist.value = focusDist;
+    this.dofMaterial.uniforms.uFocalDepth.value = focalDepth;
+    this.dofMaterial.uniforms.uFarRange.value = farRange;
     this.dofMaterial.uniforms.uNear.value = this.activeCamera.near;
     this.dofMaterial.uniforms.uFar.value = this.activeCamera.far;
-    this.dofMaterial.uniforms.uMaxBlur.value = baseMaxBlur * dofFade;
+    this.dofMaterial.uniforms.uMaxBlur.value = maxBlur;
 
     // Pass 1: Render Layer 0 (studio, hosts, signage, opaque balls & machine body) into linear HDR target + depth
     this.activeCamera.layers.set(0);
@@ -953,6 +1122,22 @@ export class ThreeEngine implements Engine {
   instances(): void {}
 
   destroy(): void {
+    for (const hostGroup of this.hostStandees) {
+      hostGroup.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.customDepthMaterial) {
+            child.customDepthMaterial.dispose();
+          }
+          child.geometry.dispose();
+          const mat = child.material as THREE.ShaderMaterial;
+          if (mat.uniforms?.uMap?.value instanceof THREE.Texture) {
+            mat.uniforms.uMap.value.dispose();
+          }
+          mat.dispose();
+        }
+      });
+    }
+    this.hostStandees.length = 0;
     this.dofSceneTarget.depthTexture?.dispose();
     this.dofSceneTarget.dispose();
     this.dofQuad.geometry.dispose();
@@ -982,7 +1167,7 @@ export class ThreeEngine implements Engine {
         dir.target.position.set(0, 0, -1);
         dir.add(dir.target);
         if (dir.castShadow) {
-          dir.shadow.mapSize.set(1024, 1024);
+          dir.shadow.mapSize.set(2048, 2048);
           dir.shadow.camera.near = 0.5;
           dir.shadow.camera.far = 35;
           const b = 10.5;

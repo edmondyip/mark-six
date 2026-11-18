@@ -262,8 +262,6 @@ function getTileSize(name: string): [number, number] {
   if (name === "static:track_clamps_all") return [112, 84];
   if (name === "static:ceiling_cans_all" || name === "static:track_rings_all") return [80, 60];
   if (name === "static:stage_rings_all") return [40, 20];
-  if (name === "static:host_elder_lip" || name === "static:host_pink_accent") return [64, 64];
-  if (name.startsWith("static:host_")) return [104, 104];
   if (name.startsWith("static:shoulder_wing")) return [128, 128];
   if (name.startsWith("static:tier_")) return [248, 40];
   if (name.startsWith("static:sign_")) return [48, 28];
@@ -440,9 +438,7 @@ async function main() {
     });
 
     if (isStaticTarget) {
-      const unpackMode = obj.desc.name.startsWith("static:host_")
-        ? "single"
-        : inferUnpackMode(geom.normals, geom.indices, geom.groups);
+      const unpackMode = inferUnpackMode(geom.normals, geom.indices, geom.groups);
       const [tileW, tileH] = getTileSize(obj.desc.name);
       requests.push({
         name: obj.desc.name,

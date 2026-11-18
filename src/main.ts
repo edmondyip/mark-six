@@ -10,6 +10,16 @@ import { BroadcastHUD } from "./ui/BroadcastHUD";
 import type { StaticGiLayout } from "./gi/lightmapAtlas";
 import { isMobileDevice, yieldToMain } from "./utils/device";
 
+async function loadHostStandeeTextures() {
+  const loader = new THREE.TextureLoader();
+  const baseUrl = import.meta.env.BASE_URL;
+  const [maleTex, femaleTex] = await Promise.all([
+    loader.loadAsync(`${baseUrl}hosts/host-male.png`),
+    loader.loadAsync(`${baseUrl}hosts/host-female.png`),
+  ]);
+  return { maleTex, femaleTex };
+}
+
 async function loadBakedStaticGI() {
   const loader = new THREE.TextureLoader();
   const baseUrl = import.meta.env.BASE_URL;
@@ -71,14 +81,21 @@ async function bootstrap() {
   await yieldToMain();
 
   let bakedGI: Awaited<ReturnType<typeof loadBakedStaticGI>> | null = null;
+  let hostStandees: Awaited<ReturnType<typeof loadHostStandeeTextures>> | null = null;
   if (isMobile) {
-    await RAPIER.init();
+    const [, loadedHosts] = await Promise.all([
+      RAPIER.init(),
+      loadHostStandeeTextures().catch(() => null),
+    ]);
+    hostStandees = loadedHosts;
   } else {
-    const [, loadedGi] = await Promise.all([
+    const [, loadedGi, loadedHosts] = await Promise.all([
       RAPIER.init(),
       loadBakedStaticGI().catch(() => null),
+      loadHostStandeeTextures().catch(() => null),
     ]);
     bakedGI = loadedGi;
+    hostStandees = loadedHosts;
   }
 
   loader.update(45, "正在初始化 WebGL 渲染引擎...");
@@ -93,6 +110,9 @@ async function bootstrap() {
   if (bakedGI) {
     engine.setBakedStaticGI(bakedGI.layout, bakedGI.aoTex, bakedGI.lightMapTex);
   }
+  if (hostStandees) {
+    engine.setHostStandees(hostStandees.maleTex, hostStandees.femaleTex);
+  }
   loader.update(72, "正在建構攪珠機與 49 粒號碼球...");
   await yieldToMain();
 
@@ -106,8 +126,8 @@ async function bootstrap() {
 
   const maleBubbleEl = document.getElementById("host-bubble-male");
   const femaleBubbleEl = document.getElementById("host-bubble-female");
-  const maleHeadWorld = new THREE.Vector3(-4.85, 6.08, -13.04);
-  const femaleHeadWorld = new THREE.Vector3(4.85, 5.92, -13.04);
+  const maleHeadWorld = new THREE.Vector3(-3.80, 4.82, -7.8);
+  const femaleHeadWorld = new THREE.Vector3(3.80, 4.60, -7.8);
   const projVec = new THREE.Vector3();
   let hostSpeechActive = false;
 

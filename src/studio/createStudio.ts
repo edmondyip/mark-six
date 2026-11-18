@@ -19,7 +19,6 @@ import {
   mergeSceneGeometries,
 } from "../utils/procedural";
 import { createCurvedWallSignageGeometry } from "./studioSignage";
-import { createStudioHosts } from "./createStudioHosts";
 
 export interface StudioBuildResult {
   group: Group;
@@ -494,9 +493,6 @@ export function createStudio(isMobile = false): StudioBuildResult {
   const ledArcsAll = new Mesh(mergeSceneGeometries(ledArcParts), stepLedMat);
   ledArcsAll.castShadow = false;
   group.add(ledArcsAll);
-
-  // 3b. Motionless Smooth Studio Hosts standing on top-tier rear stepped risers
-  group.add(createStudioHosts(isMobile));
 
   // 4. Sculpted High-FPS Lighting Rig (relying on baked GI lightmap for wall spotlights & perimeter wash)
   const keyLight = new DirectionalLight(0xfff8f0, 1.92);
